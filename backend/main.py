@@ -16,30 +16,41 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class UFDS:
+# -----------------------------
+# Estructura DSU (Union-Find) - Leal a tu estructura de clase
+# -----------------------------
+class DSU:
     def __init__(self, n):
-        self.parent = list(range(n))
-        self.rank = [0] * n
+        self.p = list(range(n))
+        self.r = [0]*n
+    def find(self, x):
+        if self.p[x] != x:
+            self.p[x] = self.find(self.p[x])
+        return self.p[x]
+    def union(self, a, b):
+        a = self.find(a); b = self.find(b)
+        if a == b:
+            return False
+        if self.r[a] < self.r[b]:
+            a, b = b, a
+        self.p[b] = a
+        if self.r[a] == self.r[b]:
+            self.r[a] += 1
+        return True
 
-    def find(self, i):
-        if self.parent[i] == i:
-            return i
-        self.parent[i] = self.find(self.parent[i])
-        return self.parent[i]
-
-    def union(self, i, j):
-        root_i = self.find(i)
-        root_j = self.find(j)
-        if root_i != root_j:
-            if self.rank[root_i] < self.rank[root_j]:
-                self.parent[root_i] = root_j
-            elif self.rank[root_i] > self.rank[root_j]:
-                self.parent[root_j] = root_i
-            else:
-                self.parent[root_j] = root_i
-                self.rank[root_i] += 1
-            return True
-        return False
+# -----------------------------
+# Algoritmo de Kruskal - Leal a tu estructura de clase
+# -----------------------------
+def kruskal(n, edges):
+    edges_sorted = sorted(edges, key=lambda e: e[2])
+    dsu = DSU(n)
+    mst = []
+    total = 0
+    for u, v, w in edges_sorted:
+        if dsu.union(u, v):
+            mst.append((u, v, w))
+            total += w
+    return mst, total
 
 datos_nodos = []
 x_coords = []
@@ -69,24 +80,23 @@ def cargar_datos():
             "x": float(x_coords[i]),
             "y": float(y_coords[i])
         })
-    print(f"¡Servidor FastAPI listo! {len(datos_nodos)} nodos cargados en memoria.")
+    print(f"¡Servidor FastAPI listo! {len(datos_nodos)} nodos cargados.")
 
 @app.get("/api/nodos")
 def get_nodos():
-    """Devuelve los nodos base para dibujar el mapa inicial."""
     return {"nodos": datos_nodos}
 
 @app.get("/api/kruskal")
 def ejecutar_kruskal():
-    """Ejecuta KDTree + Kruskal y devuelve las aristas óptimas."""
     start_time = time.time()
     num_nodos = len(x_coords)
     puntos = np.column_stack((x_coords, y_coords))
     
+    # Generación de aristas candidatas vía KDTree (optimizado para complejidad O(E log V))
     arbol = KDTree(puntos)
     distancias, indices = arbol.query(puntos, k=15) 
     
-    aristas_candidatas = []
+    edges = []
     aristas_vistas = set()
     
     for i in range(num_nodos):
@@ -97,29 +107,16 @@ def ejecutar_kruskal():
             
             if arista_id not in aristas_vistas:
                 aristas_vistas.add(arista_id)
-                aristas_candidatas.append((peso, i, vecino))
+                edges.append((i, vecino, peso))
                 
-    aristas_candidatas.sort(key=lambda item: item[0])
+    # Llamada a tu implementación de clase
+    mst_edges, costo_total = kruskal(num_nodos, edges)
     
-    ufds = UFDS(num_nodos)
-    mst_aristas = []
-    costo_total = 0.0
-    
-    for peso, u, v in aristas_candidatas:
-        if ufds.union(u, v):
-            mst_aristas.append({"origen": u, "destino": v})
-            costo_total += peso
-            if len(mst_aristas) == num_nodos - 1:
-                break
-                
     tiempo_ms = round((time.time() - start_time) * 1000, 2)
     
+    # Formatear salida para el Frontend
     return {
         "nodos": datos_nodos,
-        "aristas": mst_aristas,
+        "aristas": [{"origen": u, "destino": v} for u, v, w in mst_edges],
         "metricas": {
             "distancia": round(costo_total, 4),
-            "total_aristas": len(mst_aristas),
-            "tiempo_ms": tiempo_ms
-        }
-    }
