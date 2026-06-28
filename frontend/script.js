@@ -12,8 +12,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('mapCanvas');
     const ctx = canvas.getContext('2d');
 
-    const API_URL = 'http://localhost:8000';
-
+    const API_URL = 'https://api-electro-cusco.onrender.com';
+    
     let graphData = { nodos: [], aristas: [], minX: 0, maxX: 0, minY: 0, maxY: 0 };
     let camera = { x: 0, y: 0, scale: 1, baseScale: 1 };
     let isDragging = false;
